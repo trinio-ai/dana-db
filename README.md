@@ -68,7 +68,7 @@ If you're setting up the database for the first time or need to recreate the ini
    docker exec dana-local-dev-postgres-1 psql -U dana_user -d dana -c "\dx"
    ```
 
-**Note**: For clean database setups, PostgreSQL extensions (uuid-ossp, vector, pg_trgm, btree_gin) are automatically enabled via the initialization script in `/init-db/01_init_extensions.sql`. This ensures the pgvector extension is available for embeddings without manual intervention.
+**Note**: For clean database setups, PostgreSQL extensions (uuid-ossp, vector, pg_trgm, btree_gin) are automatically enabled via the initialization script in `scripts/01_init_extensions.sql`. This ensures the pgvector extension is available for embeddings without manual intervention.
 
 ### Regular Usage (After Initial Setup)
 
