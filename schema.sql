@@ -5,7 +5,7 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "vector";
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ============================================================================
 -- ORGANIZATIONS & USERS
@@ -75,6 +75,112 @@ CREATE TABLE IF NOT EXISTS data_schemas (
     relationships JSONB DEFAULT '{}', -- Foreign key relationships
     metadata JSONB DEFAULT '{}', -- Additional metadata
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- DATA INTEGRATION ENGINE TABLES
+-- ============================================================================
+
+-- Connection configurations for data integration engine
+CREATE TABLE IF NOT EXISTS integration_connections (
+    id VARCHAR(255) PRIMARY KEY, -- Custom connection ID from data integration engine
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL, -- 'postgresql', 'mysql', 'bigquery', etc.
+    host VARCHAR(255),
+    port INTEGER,
+    database_name VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'unknown', -- 'healthy', 'unhealthy', 'unavailable', 'unknown'
+    last_tested TIMESTAMP WITH TIME ZONE,
+    capabilities TEXT[], -- Array of supported capabilities
+    config_encrypted TEXT, -- Encrypted connection configuration
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Connection test results and health monitoring
+CREATE TABLE IF NOT EXISTS integration_connection_tests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    connection_id VARCHAR(255) NOT NULL REFERENCES integration_connections(id) ON DELETE CASCADE,
+    success BOOLEAN NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    response_time_ms BIGINT NOT NULL,
+    tested_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    server_version VARCHAR(255),
+    available_schemas TEXT[],
+    connection_pool_status VARCHAR(50),
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Query execution logs for data integration engine
+CREATE TABLE IF NOT EXISTS integration_query_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    connection_id VARCHAR(255) REFERENCES integration_connections(id) ON DELETE SET NULL,
+    query_hash VARCHAR(64) NOT NULL, -- Hash of the executed query
+    query_type VARCHAR(20) NOT NULL, -- 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRANSACTION'
+    success BOOLEAN NOT NULL,
+    execution_time_ms BIGINT NOT NULL,
+    affected_rows BIGINT,
+    result_row_count BIGINT,
+    error_message TEXT,
+    error_code VARCHAR(50),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    request_id VARCHAR(255), -- For tracing
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Schema cache for data integration engine (extended metadata)
+CREATE TABLE IF NOT EXISTS integration_schema_cache (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    connection_id VARCHAR(255) NOT NULL REFERENCES integration_connections(id) ON DELETE CASCADE,
+    schema_name VARCHAR(255),
+    table_name VARCHAR(255) NOT NULL,
+    columns JSONB NOT NULL, -- Detailed column information with types, constraints
+    indexes JSONB DEFAULT '[]', -- Index information
+    foreign_keys JSONB DEFAULT '[]', -- Foreign key relationships
+    triggers JSONB DEFAULT '[]', -- Trigger information
+    relationships JSONB DEFAULT '[]', -- Table relationships
+    row_count BIGINT,
+    size_mb DECIMAL(10,2),
+    last_analyzed TIMESTAMP WITH TIME ZONE,
+    cache_expires TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Database context cache for organizations
+CREATE TABLE IF NOT EXISTS integration_database_contexts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    schema_version VARCHAR(50) NOT NULL,
+    database_name VARCHAR(255),
+    schema_name VARCHAR(255),
+    context_data JSONB NOT NULL, -- Complete database context
+    last_updated TIMESTAMP WITH TIME ZONE NOT NULL,
+    cache_expires TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(organization_id, database_name, schema_name)
+);
+
+-- Query performance metrics
+CREATE TABLE IF NOT EXISTS integration_query_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    connection_id VARCHAR(255) REFERENCES integration_connections(id) ON DELETE SET NULL,
+    query_pattern_hash VARCHAR(64) NOT NULL, -- Hash of query pattern (normalized)
+    avg_execution_time_ms DECIMAL(10,2) NOT NULL,
+    min_execution_time_ms BIGINT NOT NULL,
+    max_execution_time_ms BIGINT NOT NULL,
+    execution_count BIGINT NOT NULL DEFAULT 1,
+    success_rate DECIMAL(5,2) NOT NULL DEFAULT 100.00,
+    last_executed TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(organization_id, connection_id, query_pattern_hash)
 );
 
 -- ============================================================================
@@ -377,6 +483,25 @@ CREATE INDEX idx_user_sessions_expires ON user_sessions(expires_at);
 CREATE INDEX idx_data_sources_organization_id ON data_sources(organization_id);
 CREATE INDEX idx_data_schemas_data_source_id ON data_schemas(data_source_id);
 
+-- Data integration engine indexes
+CREATE INDEX idx_integration_connections_organization_id ON integration_connections(organization_id);
+CREATE INDEX idx_integration_connections_type ON integration_connections(type);
+CREATE INDEX idx_integration_connections_status ON integration_connections(status);
+CREATE INDEX idx_integration_connection_tests_connection_id ON integration_connection_tests(connection_id);
+CREATE INDEX idx_integration_connection_tests_tested_at ON integration_connection_tests(tested_at);
+CREATE INDEX idx_integration_query_logs_organization_id ON integration_query_logs(organization_id);
+CREATE INDEX idx_integration_query_logs_connection_id ON integration_query_logs(connection_id);
+CREATE INDEX idx_integration_query_logs_created_at ON integration_query_logs(created_at);
+CREATE INDEX idx_integration_query_logs_query_hash ON integration_query_logs(query_hash);
+CREATE INDEX idx_integration_schema_cache_organization_id ON integration_schema_cache(organization_id);
+CREATE INDEX idx_integration_schema_cache_connection_id ON integration_schema_cache(connection_id);
+CREATE INDEX idx_integration_schema_cache_table_name ON integration_schema_cache(table_name);
+CREATE INDEX idx_integration_database_contexts_organization_id ON integration_database_contexts(organization_id);
+CREATE INDEX idx_integration_database_contexts_cache_expires ON integration_database_contexts(cache_expires);
+CREATE INDEX idx_integration_query_metrics_organization_id ON integration_query_metrics(organization_id);
+CREATE INDEX idx_integration_query_metrics_connection_id ON integration_query_metrics(connection_id);
+CREATE INDEX idx_integration_query_metrics_last_executed ON integration_query_metrics(last_executed);
+
 -- Conversation indexes
 CREATE INDEX idx_conversations_user_id ON conversations(user_id);
 CREATE INDEX idx_conversations_status ON conversations(status);
@@ -448,4 +573,17 @@ CREATE TRIGGER update_ai_agents_updated_at BEFORE UPDATE ON ai_agents
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_scheduled_tasks_updated_at BEFORE UPDATE ON scheduled_tasks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Data integration engine triggers
+CREATE TRIGGER update_integration_connections_updated_at BEFORE UPDATE ON integration_connections
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_integration_schema_cache_updated_at BEFORE UPDATE ON integration_schema_cache
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_integration_database_contexts_updated_at BEFORE UPDATE ON integration_database_contexts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_integration_query_metrics_updated_at BEFORE UPDATE ON integration_query_metrics
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

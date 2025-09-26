@@ -1,3 +1,10 @@
+-- Create required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "btree_gin";
+
 -- Create "organizations" table
 CREATE TABLE "public"."organizations" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -219,7 +226,7 @@ CREATE TABLE "public"."document_embeddings" (
   "document_id" uuid NOT NULL,
   "content" text NOT NULL,
   "metadata" jsonb NULL DEFAULT '{}',
-  "embedding" public.vector(1536) NULL,
+  "embedding" vector(1536) NULL,
   "created_at" timestamptz NULL DEFAULT now(),
   PRIMARY KEY ("id"),
   CONSTRAINT "document_embeddings_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
