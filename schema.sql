@@ -178,17 +178,22 @@ CREATE TABLE tasks (
     status VARCHAR(20) DEFAULT 'draft',
     execution_mode VARCHAR(20) DEFAULT 'synchronous',
     timeout_seconds INTEGER DEFAULT 30,
-    html_component TEXT NOT NULL,
-    validation_schema JSONB NOT NULL,
-    data_fetch_code TEXT,
-    data_commit_code TEXT,
     data_source_id UUID REFERENCES data_sources(id),
     input_schema JSONB DEFAULT '{}',
     output_schema JSONB DEFAULT '{}',
-    s3_bucket VARCHAR(255),
-    s3_key VARCHAR(500),
-    s3_version_id VARCHAR(255),
-    code_hash VARCHAR(64),
+    s3_bucket VARCHAR(255) NOT NULL,
+    html_component_s3_key VARCHAR(500) NOT NULL,
+    html_component_version_id VARCHAR(255),
+    html_component_hash VARCHAR(64),
+    validation_schema_s3_key VARCHAR(500) NOT NULL,
+    validation_schema_version_id VARCHAR(255),
+    validation_schema_hash VARCHAR(64),
+    data_fetch_code_s3_key VARCHAR(500),
+    data_fetch_code_version_id VARCHAR(255),
+    data_fetch_code_hash VARCHAR(64),
+    data_commit_code_s3_key VARCHAR(500),
+    data_commit_code_version_id VARCHAR(255),
+    data_commit_code_hash VARCHAR(64),
     erp_core_endpoint VARCHAR(255),
     deployment_status VARCHAR(20) DEFAULT 'pending',
     deployed_version VARCHAR(50),
@@ -200,10 +205,7 @@ CREATE TABLE tasks (
     success_rate DECIMAL(5,2) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT check_storage_consistency CHECK (
-        (task_category = 'core' AND s3_bucket IS NOT NULL AND s3_key IS NOT NULL) OR
-        (task_category = 'custom' AND s3_bucket IS NOT NULL AND s3_key IS NOT NULL)
-    )
+    CONSTRAINT check_s3_storage CHECK (s3_bucket IS NOT NULL)
 );
 
 CREATE INDEX idx_tasks_org_type ON tasks(organization_id, task_type);
