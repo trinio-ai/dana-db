@@ -77,6 +77,7 @@ CREATE TABLE team_members (
     role VARCHAR(50) DEFAULT 'member',
     added_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(team_id, user_id)
 );
 
@@ -146,7 +147,8 @@ CREATE TABLE chat_messages (
     content TEXT NOT NULL,
     metadata JSONB DEFAULT '{}',
     parent_message_id UUID REFERENCES chat_messages(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_messages_conversation ON chat_messages(conversation_id, created_at);
@@ -158,7 +160,8 @@ CREATE TABLE message_feedback (
     user_id UUID NOT NULL REFERENCES users(id),
     feedback_type VARCHAR(20) NOT NULL,
     comment TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_feedback_message ON message_feedback(message_id);
@@ -248,6 +251,7 @@ CREATE TABLE workflow_permissions (
     granted_by UUID REFERENCES users(id),
     team_id UUID REFERENCES teams(id), -- NULL for direct user grants
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(workflow_id, user_id)
 );
 
@@ -285,6 +289,7 @@ CREATE TABLE workflow_task_edges (
     data_mapping JSONB,
     execution_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(workflow_id, source_task_id, target_task_id)
 );
 
@@ -373,7 +378,8 @@ CREATE TABLE agent_activities (
     status VARCHAR(20) DEFAULT 'pending',
     execution_time_ms INTEGER,
     error_message TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_activities_agent ON agent_activities(agent_id, created_at DESC);
@@ -416,7 +422,8 @@ CREATE TABLE api_keys (
     expires_at TIMESTAMP WITH TIME ZONE,
     last_used TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_apikeys_org ON api_keys(organization_id);
@@ -432,7 +439,8 @@ CREATE TABLE audit_logs (
     event_data JSONB DEFAULT '{}',
     ip_address INET,
     user_agent TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_audit_logs_org_date ON audit_logs(organization_id, created_at DESC);
@@ -449,7 +457,8 @@ CREATE TABLE data_access_logs (
     row_count INTEGER,
     execution_time_ms INTEGER,
     status VARCHAR(20),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_access_logs_org_date ON data_access_logs(organization_id, created_at DESC);
@@ -468,7 +477,8 @@ CREATE TABLE document_embeddings (
     content TEXT NOT NULL,
     metadata JSONB DEFAULT '{}',
     embedding vector(1536),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_embeddings_vector ON document_embeddings USING hnsw (embedding vector_cosine_ops);
@@ -496,7 +506,8 @@ CREATE TABLE performance_baselines (
     baseline_value DOUBLE PRECISION NOT NULL,
     threshold_warning DOUBLE PRECISION,
     threshold_critical DOUBLE PRECISION,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_baselines_org ON performance_baselines(organization_id);
