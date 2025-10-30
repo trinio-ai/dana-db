@@ -486,6 +486,64 @@ CREATE INDEX idx_embeddings_org ON document_embeddings(organization_id);
 CREATE INDEX idx_embeddings_type ON document_embeddings(document_type);
 
 -- ============================================================================
+-- CHAT AGENT (for multi-agent conversational AI)
+-- ============================================================================
+
+-- Chat document embeddings for RAG with pgvector
+CREATE TABLE chat_document_embeddings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    collection_name VARCHAR(50) NOT NULL,
+    document_id VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    embedding vector(384) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    content_tsv tsvector,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT chat_document_embeddings_unique UNIQUE (collection_name, document_id)
+);
+
+CREATE INDEX idx_chat_doc_embeddings_vector ON chat_document_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+CREATE INDEX idx_chat_doc_embeddings_org ON chat_document_embeddings(organization_id);
+CREATE INDEX idx_chat_doc_embeddings_collection ON chat_document_embeddings(collection_name);
+CREATE INDEX idx_chat_doc_embeddings_fts ON chat_document_embeddings USING gin (content_tsv);
+
+-- Chat sessions for conversation tracking
+CREATE TABLE chat_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    user_role VARCHAR(20) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_chat_sessions_user ON chat_sessions(user_id);
+CREATE INDEX idx_chat_sessions_org ON chat_sessions(organization_id);
+CREATE INDEX idx_chat_sessions_last_active ON chat_sessions(last_active_at);
+
+-- Conversation turns for analytics and debugging
+CREATE TABLE conversation_turns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+    user_message TEXT NOT NULL,
+    assistant_message TEXT NOT NULL,
+    intent VARCHAR(50) NOT NULL,
+    agent_type VARCHAR(50) NOT NULL,
+    confidence DOUBLE PRECISION NOT NULL,
+    latency_ms DOUBLE PRECISION NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_conversation_turns_session ON conversation_turns(session_id);
+CREATE INDEX idx_conversation_turns_intent ON conversation_turns(intent);
+CREATE INDEX idx_conversation_turns_agent ON conversation_turns(agent_type);
+CREATE INDEX idx_conversation_turns_created ON conversation_turns(created_at);
+
+-- ============================================================================
 -- PERFORMANCE & MONITORING
 -- ============================================================================
 
@@ -537,6 +595,7 @@ CREATE TRIGGER update_task_executions_updated_at BEFORE UPDATE ON task_execution
 CREATE TRIGGER update_workflow_executions_updated_at BEFORE UPDATE ON workflow_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_ai_agents_updated_at BEFORE UPDATE ON ai_agents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_scheduled_tasks_updated_at BEFORE UPDATE ON scheduled_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_chat_document_embeddings_updated_at BEFORE UPDATE ON chat_document_embeddings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Add forward-referenced foreign key constraints
 ALTER TABLE task_executions 
