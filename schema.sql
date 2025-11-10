@@ -198,7 +198,8 @@ CREATE TABLE tasks (
     data_commit_code_s3_key VARCHAR(500),
     data_commit_code_version_id VARCHAR(255),
     data_commit_code_hash VARCHAR(64),
-    erp_core_endpoint VARCHAR(255),
+    fetch_endpoint VARCHAR(500),
+    commit_endpoint VARCHAR(500),
     deployment_status VARCHAR(20) DEFAULT 'pending',
     deployed_version VARCHAR(50),
     version INTEGER DEFAULT 1,
@@ -302,16 +303,20 @@ CREATE TABLE task_executions (
     task_id UUID NOT NULL REFERENCES tasks(id),
     workflow_execution_id UUID,
     user_id UUID NOT NULL REFERENCES users(id),
+    task_index INTEGER DEFAULT 0,
     status VARCHAR(20) DEFAULT 'pending',
     input_parameters JSONB,
     result_data JSONB,
     error_message TEXT,
     error_details JSONB,
     retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 0,
     execution_time_ms INTEGER,
     queue_time_ms INTEGER,
-    erp_core_instance VARCHAR(255),
+    executor_instance VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -324,6 +329,7 @@ CREATE TABLE workflow_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workflow_id UUID NOT NULL REFERENCES workflows(id),
     user_id UUID NOT NULL REFERENCES users(id),
+    org_id UUID NOT NULL REFERENCES organizations(id),
     conversation_id UUID REFERENCES conversations(id),
     status VARCHAR(20) DEFAULT 'pending',
     input_parameters JSONB,
@@ -336,13 +342,18 @@ CREATE TABLE workflow_executions (
     max_retries INTEGER DEFAULT 3,
     execution_time_ms INTEGER,
     queue_time_ms INTEGER,
+    total_tasks INTEGER DEFAULT 0,
+    completed_tasks INTEGER DEFAULT 0,
     worker_id VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_workflow_executions_workflow ON workflow_executions(workflow_id, created_at DESC);
 CREATE INDEX idx_workflow_executions_user ON workflow_executions(user_id, status);
+CREATE INDEX idx_workflow_executions_org ON workflow_executions(org_id);
 CREATE INDEX idx_workflow_executions_status ON workflow_executions(status);
 
 -- ============================================================================
