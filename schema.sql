@@ -554,6 +554,26 @@ CREATE INDEX idx_conversation_turns_intent ON conversation_turns(intent);
 CREATE INDEX idx_conversation_turns_agent ON conversation_turns(agent_type);
 CREATE INDEX idx_conversation_turns_created ON conversation_turns(created_at);
 
+-- LangChain PGVector tables for RAG (auto-managed by LangChain library)
+-- These tables support multi-collection vector search with JSONB metadata filtering
+CREATE TABLE langchain_pg_collection (
+    name VARCHAR,
+    cmetadata JSON,
+    uuid UUID NOT NULL PRIMARY KEY
+);
+
+CREATE TABLE langchain_pg_embedding (
+    collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
+    embedding VECTOR,
+    document VARCHAR,
+    cmetadata JSONB,
+    custom_id VARCHAR,
+    uuid UUID NOT NULL PRIMARY KEY
+);
+
+-- Index for fast JSONB metadata filtering (e.g., organization_id, workflow_id)
+CREATE INDEX ix_cmetadata_gin ON langchain_pg_embedding USING gin (cmetadata jsonb_path_ops);
+
 -- ============================================================================
 -- PERFORMANCE & MONITORING
 -- ============================================================================
