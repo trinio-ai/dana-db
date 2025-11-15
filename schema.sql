@@ -43,18 +43,23 @@ CREATE TABLE users (
 CREATE INDEX idx_users_org ON users(organization_id);
 CREATE INDEX idx_users_email ON users(email);
 
--- User sessions
+-- User sessions (for JWT refresh token management)
 CREATE TABLE user_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id),
     session_token VARCHAR(255) UNIQUE NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    ip_address VARCHAR(45),
+    user_agent TEXT
 );
 
 CREATE INDEX idx_sessions_user ON user_sessions(user_id);
 CREATE INDEX idx_sessions_token ON user_sessions(session_token);
+CREATE INDEX idx_sessions_last_activity ON user_sessions(last_activity);
+CREATE INDEX idx_sessions_expires_at ON user_sessions(expires_at);
 
 -- Teams (for future workflow/task sharing within organization)
 CREATE TABLE teams (
