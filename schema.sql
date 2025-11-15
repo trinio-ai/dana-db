@@ -285,6 +285,20 @@ CREATE INDEX idx_task_permissions_task ON task_permissions(task_id);
 CREATE INDEX idx_task_permissions_user ON task_permissions(user_id);
 CREATE INDEX idx_task_permissions_team ON task_permissions(team_id);
 
+-- Workflow bookmarks (user-scoped favorites)
+CREATE TABLE workflow_bookmarks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, workflow_id)
+);
+
+CREATE INDEX idx_workflow_bookmarks_user ON workflow_bookmarks(user_id);
+CREATE INDEX idx_workflow_bookmarks_workflow ON workflow_bookmarks(workflow_id);
+CREATE INDEX idx_workflow_bookmarks_user_created ON workflow_bookmarks(user_id, created_at DESC);
+
 CREATE TABLE workflow_task_edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workflow_id UUID NOT NULL REFERENCES workflows(id),
