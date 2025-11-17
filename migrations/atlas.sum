@@ -1,4 +1,4 @@
-h1:Nxd8wUd+Y4n4qSHr1EHotIDf68WLN+ihqugD/s8lKYc=
+h1:NUpD/wcul1Q0DZPHEHf0PlNxUTe+l2whfAqiMwxkaOM=
 20251023000000_initial_extensions.sql h1:9WL6yJi7PwR+4PRjngPuJq/E8Bg39/SCVdSt6d+yJTc=
 20251023133153_migration_20251023_223152.sql h1:TiqGUNpW5qVK+TkKXYNT2pKnGH3wVKq0dAyhOapHC9E=
 20251024000000_update_tasks_s3_fields.sql h1:waUG2IXrTR1e0Ay2sonJdRSbvaUExKoMwgSUhECGDB0=
@@ -13,3 +13,5 @@ h1:Nxd8wUd+Y4n4qSHr1EHotIDf68WLN+ihqugD/s8lKYc=
 20251115054302_migration_20251115_144300.sql h1:tb3nia0BhfM9hep205dILE51g5N4buxmbjcJcBJ+C30=
 20251115074813_migration_20251115_164812.sql h1:4V85Lh3PY+awnZ+jI6RQAGSKtLeOORYpfT0NvNKVpU8=
 20251115081140_migration_20251115_171139.sql h1:xDRIDvIOIG877/MbglXhXzlDLWLAz64N+JjPeZJsiTI=
+20251117054747_add_updated_at_to_chat_sessions.sql h1:nKP7tVZPNV6I0YsJHrq6CTCDEb7PbYjlYBEb+aiuuZw=
+20251117060500_add_updated_at_to_conversation_turns.sql h1:OFLazHSY6gPZ+LuaNjIbyZyfUnPj/R+xp8xkfeIDhoc=
