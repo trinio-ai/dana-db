@@ -187,6 +187,7 @@ CREATE TABLE tasks (
     status VARCHAR(20) DEFAULT 'draft',
     execution_mode VARCHAR(20) DEFAULT 'synchronous',
     timeout_seconds INTEGER DEFAULT 30,
+    environment_profile_id UUID,
     data_source_id UUID REFERENCES data_sources(id),
     input_schema JSONB DEFAULT '{}',
     output_schema JSONB DEFAULT '{}',
@@ -221,6 +222,26 @@ CREATE TABLE tasks (
 CREATE INDEX idx_tasks_org_type ON tasks(organization_id, task_type);
 CREATE INDEX idx_tasks_status ON tasks(status) WHERE status = 'active';
 CREATE INDEX idx_tasks_category ON tasks(task_category);
+CREATE INDEX idx_tasks_env_profile ON tasks(environment_profile_id);
+
+-- Modules table: Filesystem-like organization for workflows
+CREATE TABLE modules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    parent_module_id UUID REFERENCES modules(id) ON DELETE CASCADE,
+    path TEXT NOT NULL, -- Full path like "/folder1/subfolder2"
+    module_type VARCHAR(20) DEFAULT 'folder', -- 'folder', 'root'
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT unique_org_path UNIQUE(organization_id, path)
+);
+
+CREATE INDEX idx_modules_org ON modules(organization_id);
+CREATE INDEX idx_modules_parent ON modules(parent_module_id);
+CREATE INDEX idx_modules_path ON modules(organization_id, path);
 
 CREATE TABLE workflows (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -230,7 +251,7 @@ CREATE TABLE workflows (
     created_by UUID REFERENCES users(id),
     conversation_id UUID REFERENCES conversations(id),
     status VARCHAR(20) DEFAULT 'draft',
-    workflow_category VARCHAR(50),
+    module_id UUID REFERENCES modules(id) ON DELETE SET NULL,
     timeout_seconds INTEGER DEFAULT 300,
     max_parallel_tasks INTEGER DEFAULT 5,
     dag_visualization JSONB,
@@ -246,7 +267,7 @@ CREATE TABLE workflows (
 
 CREATE INDEX idx_workflows_user ON workflows(created_by, status);
 CREATE INDEX idx_workflows_org ON workflows(organization_id);
-CREATE INDEX idx_workflows_category ON workflows(workflow_category);
+CREATE INDEX idx_workflows_module ON workflows(module_id);
 
 -- Workflow permissions (user-scoped with explicit sharing)
 CREATE TABLE workflow_permissions (
@@ -298,6 +319,67 @@ CREATE TABLE workflow_bookmarks (
 CREATE INDEX idx_workflow_bookmarks_user ON workflow_bookmarks(user_id);
 CREATE INDEX idx_workflow_bookmarks_workflow ON workflow_bookmarks(workflow_id);
 CREATE INDEX idx_workflow_bookmarks_user_created ON workflow_bookmarks(user_id, created_at DESC);
+
+-- ============================================================================
+-- LIBRARY MANAGEMENT & ENVIRONMENT PROFILES
+-- ============================================================================
+
+-- Library Registry - Approved Python libraries for sandboxed execution
+CREATE TABLE library_registry (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) UNIQUE NOT NULL,
+    approved_versions TEXT[] NOT NULL DEFAULT '{}',
+    description TEXT,
+    category VARCHAR(100),
+    security_status VARCHAR(50) DEFAULT 'safe',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_library_registry_name ON library_registry(name);
+CREATE INDEX idx_library_registry_category ON library_registry(category);
+CREATE INDEX idx_library_registry_active ON library_registry(is_active);
+
+-- Environment Profiles - Pre-defined sets of libraries for task execution
+CREATE TABLE environment_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    version INTEGER DEFAULT 1,
+    libraries JSONB NOT NULL DEFAULT '{}',
+    is_built BOOLEAN DEFAULT false,
+    build_path VARCHAR(500),
+    build_date TIMESTAMP WITH TIME ZONE,
+    build_size_mb INTEGER,
+    requirements_txt TEXT,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    usage_count INTEGER DEFAULT 0,
+    org_id UUID REFERENCES organizations(id),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(name, org_id)
+);
+
+CREATE INDEX idx_environment_profiles_name ON environment_profiles(name);
+CREATE INDEX idx_environment_profiles_org ON environment_profiles(org_id);
+CREATE INDEX idx_environment_profiles_active ON environment_profiles(is_active);
+
+-- Task Library Requirements - Links tasks to required libraries
+CREATE TABLE task_library_requirements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    library_name VARCHAR(255) NOT NULL,
+    library_version VARCHAR(50) NOT NULL,
+    is_required BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(task_id, library_name)
+);
+
+CREATE INDEX idx_task_library_req_task ON task_library_requirements(task_id);
+CREATE INDEX idx_task_library_req_library ON task_library_requirements(library_name);
 
 CREATE TABLE workflow_task_edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -547,6 +629,7 @@ CREATE TABLE chat_sessions (
     user_role VARCHAR(20) NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -565,7 +648,8 @@ CREATE TABLE conversation_turns (
     confidence DOUBLE PRECISION NOT NULL,
     latency_ms DOUBLE PRECISION NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_conversation_turns_session ON conversation_turns(session_id);
@@ -646,8 +730,14 @@ CREATE TRIGGER update_workflow_executions_updated_at BEFORE UPDATE ON workflow_e
 CREATE TRIGGER update_ai_agents_updated_at BEFORE UPDATE ON ai_agents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_scheduled_tasks_updated_at BEFORE UPDATE ON scheduled_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_chat_document_embeddings_updated_at BEFORE UPDATE ON chat_document_embeddings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_library_registry_updated_at BEFORE UPDATE ON library_registry FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_environment_profiles_updated_at BEFORE UPDATE ON environment_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Add forward-referenced foreign key constraints
-ALTER TABLE task_executions 
-ADD CONSTRAINT fk_task_exec_workflow 
+ALTER TABLE task_executions
+ADD CONSTRAINT fk_task_exec_workflow
 FOREIGN KEY (workflow_execution_id) REFERENCES workflow_executions(id);
+
+ALTER TABLE tasks
+ADD CONSTRAINT fk_task_env_profile
+FOREIGN KEY (environment_profile_id) REFERENCES environment_profiles(id);
