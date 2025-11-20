@@ -1,4 +1,4 @@
-h1:sHJEyKiikUOJ83qm1RDS4rtVH3TYtRsgjTA6FWMYRXU=
+h1:NmgNZgrQNh61eyxvc/AwbRtin6fMaa93RorAXZxBRq4=
 20251023000000_initial_extensions.sql h1:9WL6yJi7PwR+4PRjngPuJq/E8Bg39/SCVdSt6d+yJTc=
 20251023133153_migration_20251023_223152.sql h1:TiqGUNpW5qVK+TkKXYNT2pKnGH3wVKq0dAyhOapHC9E=
 20251024000000_update_tasks_s3_fields.sql h1:waUG2IXrTR1e0Ay2sonJdRSbvaUExKoMwgSUhECGDB0=
@@ -15,3 +15,5 @@ h1:sHJEyKiikUOJ83qm1RDS4rtVH3TYtRsgjTA6FWMYRXU=
 20251115081140_migration_20251115_171139.sql h1:LpodpHpEijtsVavpGc+SXqolBYm+/Mh+RnABsCSzOy4=
 20251117054747_add_updated_at_to_chat_sessions.sql h1:YZptLzBOpupe4FSSOGEgRjdZG0DEe2ENWHK3+hZY70w=
 20251117060500_add_updated_at_to_conversation_turns.sql h1:2yWAI4RE6OeluhjMPyEZM7704LL5M7VahOvqRb8PlrA=
+20251120112000_add_sandbox_organization_fields.sql h1:ASvqb0Jr9y/NglWvwE4itx3f/bvZ7eXnk1whnxD1ImI=
+20251120112001_add_cascade_to_sandbox_foreign_keys.sql h1:ygwEzlqc+MR7hGuJR3Gr6lAzvd/eY3X/MHZzRbVZ/U4=
