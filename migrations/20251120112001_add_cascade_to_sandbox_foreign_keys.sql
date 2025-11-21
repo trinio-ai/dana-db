@@ -1,26 +1,39 @@
 -- Migration: Add CASCADE to sandbox foreign key constraints
 -- Description: Ensure sandbox tasks/workflows are automatically deleted when source task/workflow is deleted
 -- Date: 2024-11-18
+-- Note: Only applies constraints if columns exist
 
--- Tasks table: Drop and recreate source_task_id constraint with CASCADE
-ALTER TABLE tasks
-DROP CONSTRAINT IF EXISTS tasks_source_task_id_fkey;
+-- Tasks table: Drop and recreate source_task_id constraint with CASCADE (if column exists)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'tasks' AND column_name = 'source_task_id'
+    ) THEN
+        ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_source_task_id_fkey;
+        ALTER TABLE tasks
+        ADD CONSTRAINT tasks_source_task_id_fkey
+        FOREIGN KEY (source_task_id)
+        REFERENCES tasks(id)
+        ON DELETE CASCADE;
+    END IF;
+END $$;
 
-ALTER TABLE tasks
-ADD CONSTRAINT tasks_source_task_id_fkey
-FOREIGN KEY (source_task_id)
-REFERENCES tasks(id)
-ON DELETE CASCADE;
-
--- Workflows table: Drop and recreate source_workflow_id constraint with CASCADE
-ALTER TABLE workflows
-DROP CONSTRAINT IF EXISTS workflows_source_workflow_id_fkey;
-
-ALTER TABLE workflows
-ADD CONSTRAINT workflows_source_workflow_id_fkey
-FOREIGN KEY (source_workflow_id)
-REFERENCES workflows(id)
-ON DELETE CASCADE;
+-- Workflows table: Drop and recreate source_workflow_id constraint with CASCADE (if column exists)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'workflows' AND column_name = 'source_workflow_id'
+    ) THEN
+        ALTER TABLE workflows DROP CONSTRAINT IF EXISTS workflows_source_workflow_id_fkey;
+        ALTER TABLE workflows
+        ADD CONSTRAINT workflows_source_workflow_id_fkey
+        FOREIGN KEY (source_workflow_id)
+        REFERENCES workflows(id)
+        ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- Verify constraints
 SELECT
