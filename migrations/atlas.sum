@@ -1,4 +1,4 @@
-h1:QhoKDKj0W00cl9u6I1PfhmD5SfagC8p4E2IYlF3cf5M=
+h1:4iFDLu5MmJ9pjZacv4IneQcX2ChJc6KrZ0C29gt2SAc=
 20251023000000_initial_extensions.sql h1:9WL6yJi7PwR+4PRjngPuJq/E8Bg39/SCVdSt6d+yJTc=
 20251023133153_migration_20251023_223152.sql h1:TiqGUNpW5qVK+TkKXYNT2pKnGH3wVKq0dAyhOapHC9E=
 20251024000000_update_tasks_s3_fields.sql h1:waUG2IXrTR1e0Ay2sonJdRSbvaUExKoMwgSUhECGDB0=
@@ -21,3 +21,4 @@ h1:QhoKDKj0W00cl9u6I1PfhmD5SfagC8p4E2IYlF3cf5M=
 20251119223540_add modules table and refactor workflows.sql h1:IlE55HZZJDieXZip7QloO6Wuhdr6QYUfqTnTbxQplzc=
 20251120112000_add_sandbox_organization_fields.sql h1:L0s72KNwvSUvZ5oXQWw9RsFCrKgsJEP4w+b6QC5Nf40=
 20251120112001_add_cascade_to_sandbox_foreign_keys.sql h1:XpXPgY2jQ+pT5RvE+hVltvgB4ipxSkBKf4My0AkHPEQ=
+20251123231453_add workflow_tasks table.sql h1:rIqhalaC4WoGu5+CVM136+o7PSIHqX0ESDLJiU9oGsQ=

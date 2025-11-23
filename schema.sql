@@ -381,6 +381,19 @@ CREATE TABLE task_library_requirements (
 CREATE INDEX idx_task_library_req_task ON task_library_requirements(task_id);
 CREATE INDEX idx_task_library_req_library ON task_library_requirements(library_name);
 
+-- Workflow Tasks - Direct association between workflows and tasks
+CREATE TABLE workflow_tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(workflow_id, task_id)
+);
+
+CREATE INDEX idx_workflow_tasks_workflow ON workflow_tasks(workflow_id);
+CREATE INDEX idx_workflow_tasks_task ON workflow_tasks(task_id);
+
 CREATE TABLE workflow_task_edges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workflow_id UUID NOT NULL REFERENCES workflows(id),
