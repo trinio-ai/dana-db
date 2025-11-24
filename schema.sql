@@ -211,6 +211,8 @@ CREATE TABLE tasks (
     version INTEGER DEFAULT 1,
     parent_task_id UUID REFERENCES tasks(id),
     is_latest_version BOOLEAN DEFAULT true,
+    is_sandbox BOOLEAN DEFAULT false,
+    source_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
     avg_execution_time_ms INTEGER DEFAULT 0,
     total_executions INTEGER DEFAULT 0,
     success_rate DECIMAL(5,2) DEFAULT 0.00,
@@ -223,6 +225,8 @@ CREATE INDEX idx_tasks_org_type ON tasks(organization_id, task_type);
 CREATE INDEX idx_tasks_status ON tasks(status) WHERE status = 'active';
 CREATE INDEX idx_tasks_category ON tasks(task_category);
 CREATE INDEX idx_tasks_env_profile ON tasks(environment_profile_id);
+CREATE INDEX idx_tasks_is_sandbox ON tasks(is_sandbox);
+CREATE INDEX idx_tasks_source_task_id ON tasks(source_task_id);
 
 -- Modules table: Filesystem-like organization for workflows
 CREATE TABLE modules (
@@ -258,6 +262,8 @@ CREATE TABLE workflows (
     version INTEGER DEFAULT 1,
     parent_workflow_id UUID REFERENCES workflows(id),
     is_latest_version BOOLEAN DEFAULT true,
+    is_sandbox BOOLEAN DEFAULT false,
+    source_workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
     avg_execution_time_ms INTEGER DEFAULT 0,
     total_executions INTEGER DEFAULT 0,
     success_rate DECIMAL(5,2) DEFAULT 0.00,
@@ -268,6 +274,8 @@ CREATE TABLE workflows (
 CREATE INDEX idx_workflows_user ON workflows(created_by, status);
 CREATE INDEX idx_workflows_org ON workflows(organization_id);
 CREATE INDEX idx_workflows_module ON workflows(module_id);
+CREATE INDEX idx_workflows_is_sandbox ON workflows(is_sandbox);
+CREATE INDEX idx_workflows_source_workflow_id ON workflows(source_workflow_id);
 
 -- Workflow permissions (user-scoped with explicit sharing)
 CREATE TABLE workflow_permissions (
