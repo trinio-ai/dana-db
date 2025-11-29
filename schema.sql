@@ -454,6 +454,7 @@ CREATE TABLE workflow_executions (
     org_id UUID NOT NULL REFERENCES organizations(id),
     conversation_id UUID REFERENCES conversations(id),
     status VARCHAR(20) DEFAULT 'pending',
+    display_name VARCHAR(255),
     input_parameters JSONB,
     result_data JSONB,
     execution_graph JSONB,
