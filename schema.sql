@@ -213,6 +213,8 @@ CREATE TABLE tasks (
     is_latest_version BOOLEAN DEFAULT true,
     is_sandbox BOOLEAN DEFAULT false,
     source_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    instructions TEXT,
+    is_standalone BOOLEAN NOT NULL DEFAULT true,
     avg_execution_time_ms INTEGER DEFAULT 0,
     total_executions INTEGER DEFAULT 0,
     success_rate DECIMAL(5,2) DEFAULT 0.00,
