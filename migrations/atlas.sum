@@ -1,4 +1,4 @@
-h1:NFdcu17I+ViiMsK8uNCenEtcgkCnqpFBxZkK8KT8Gpg=
+h1:GwXrnCfYaaoGgM1tEhVevG9BR5jeUQR7RRVcUTCFT3o=
 20251023000000_initial_extensions.sql h1:9WL6yJi7PwR+4PRjngPuJq/E8Bg39/SCVdSt6d+yJTc=
 20251023133153_migration_20251023_223152.sql h1:TiqGUNpW5qVK+TkKXYNT2pKnGH3wVKq0dAyhOapHC9E=
 20251024000000_update_tasks_s3_fields.sql h1:waUG2IXrTR1e0Ay2sonJdRSbvaUExKoMwgSUhECGDB0=
@@ -30,3 +30,4 @@ h1:NFdcu17I+ViiMsK8uNCenEtcgkCnqpFBxZkK8KT8Gpg=
 20251201100000_add_erp_module_to_tasks.sql h1:RSAMy7WZgsfQNdVSTjn94+SzDYUlMTx2KY3F/UDP+i4=
 20251201100001_rename_erp_module_to_module.sql h1:oyjepdtb85sCW9r0wec87g24sTV/nUnSrXz302EXd0Y=
 20251201110000_add_task_modules_table.sql h1:SYNPGHQj9XyoeNru23F+PMSOCJQhWfLFR3heI+lNnSs=
+20251201110001_add_sandbox_fields_to_organizations.sql h1:zSiPCDLMciF8NvaTXSrZGpkwPG2f6R2g27qhEQJM6vI=

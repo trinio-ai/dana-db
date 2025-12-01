@@ -17,12 +17,16 @@ CREATE TABLE organizations (
     plan_type VARCHAR(50) NOT NULL DEFAULT 'starter',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     settings JSONB DEFAULT '{}',
+    is_sandbox BOOLEAN NOT NULL DEFAULT false,
+    source_organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_org_slug ON organizations(slug);
 CREATE INDEX idx_org_status ON organizations(status);
+CREATE INDEX idx_org_is_sandbox ON organizations(is_sandbox);
+CREATE INDEX idx_org_source_organization_id ON organizations(source_organization_id);
 
 -- Users
 CREATE TABLE users (
@@ -230,10 +234,12 @@ CREATE TABLE tasks (
     version INTEGER DEFAULT 1,
     parent_task_id UUID REFERENCES tasks(id),
     is_latest_version BOOLEAN DEFAULT true,
-    is_sandbox BOOLEAN DEFAULT false,
-    source_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    is_sandbox BOOLEAN NOT NULL DEFAULT false,
+    source_task_id UUID,
+    CONSTRAINT fk_tasks_source_task FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     instructions TEXT,
     is_standalone BOOLEAN NOT NULL DEFAULT true,
+    module VARCHAR(50),
     avg_execution_time_ms INTEGER DEFAULT 0,
     total_executions INTEGER DEFAULT 0,
     success_rate DECIMAL(5,2) DEFAULT 0.00,
@@ -248,6 +254,7 @@ CREATE INDEX idx_tasks_category ON tasks(task_category);
 CREATE INDEX idx_tasks_env_profile ON tasks(environment_profile_id);
 CREATE INDEX idx_tasks_is_sandbox ON tasks(is_sandbox);
 CREATE INDEX idx_tasks_source_task_id ON tasks(source_task_id);
+CREATE INDEX idx_tasks_module ON tasks(module);
 
 -- Modules table: Filesystem-like organization for workflows
 CREATE TABLE modules (
@@ -283,13 +290,14 @@ CREATE TABLE workflows (
     version INTEGER DEFAULT 1,
     parent_workflow_id UUID REFERENCES workflows(id),
     is_latest_version BOOLEAN DEFAULT true,
-    is_sandbox BOOLEAN DEFAULT false,
-    source_workflow_id UUID REFERENCES workflows(id) ON DELETE CASCADE,
+    is_sandbox BOOLEAN NOT NULL DEFAULT false,
+    source_workflow_id UUID,
     avg_execution_time_ms INTEGER DEFAULT 0,
     total_executions INTEGER DEFAULT 0,
     success_rate DECIMAL(5,2) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT fk_workflows_source_workflow FOREIGN KEY (source_workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_workflows_user ON workflows(created_by, status);
@@ -440,6 +448,22 @@ CREATE TABLE workflow_task_edges (
 CREATE INDEX idx_workflow_edges_workflow ON workflow_task_edges(workflow_id);
 CREATE INDEX idx_workflow_edges_source ON workflow_task_edges(source_task_id);
 CREATE INDEX idx_workflow_edges_target ON workflow_task_edges(target_task_id);
+
+-- Task Dependencies - navigation links between related tasks
+CREATE TABLE task_dependencies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    target_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    source_field_name VARCHAR(255),
+    label VARCHAR(100) NOT NULL DEFAULT 'Create New',
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT task_dependencies_source_target_field_unique UNIQUE (source_task_id, target_task_id, source_field_name)
+);
+
+CREATE INDEX idx_task_dependencies_source ON task_dependencies(source_task_id);
+CREATE INDEX idx_task_dependencies_target ON task_dependencies(target_task_id);
 
 CREATE TABLE task_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
