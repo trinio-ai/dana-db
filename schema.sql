@@ -175,6 +175,25 @@ CREATE INDEX idx_feedback_message ON message_feedback(message_id);
 -- TASKS, WORKFLOWS & EXECUTIONS
 -- ============================================================================
 
+-- Task Modules - categories for organizing tasks by business domain
+CREATE TABLE task_modules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    slug VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon VARCHAR(50),
+    display_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT unique_org_module_slug UNIQUE (organization_id, slug)
+);
+
+CREATE INDEX idx_task_modules_org ON task_modules(organization_id);
+CREATE INDEX idx_task_modules_slug ON task_modules(slug);
+CREATE INDEX idx_task_modules_active ON task_modules(organization_id, is_active);
+
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),

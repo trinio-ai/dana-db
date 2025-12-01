@@ -3,9 +3,10 @@
 
 env "local" {
   # Local development environment using local Atlas CLI
+  # Uses dana_dev database with extensions (uuid-ossp, pgcrypto, vector) pre-installed
   src = "file://schema.sql"
   url = "postgresql://dana_user:dana_password@localhost:5432/dana?sslmode=disable"
-  dev = "postgresql://dana_user:dana_password@localhost:5432/atlas_dev?sslmode=disable"
+  dev = "postgresql://dana_user:dana_password@localhost:5432/dana_dev?sslmode=disable"
 
   migration {
     dir = "file://migrations"
@@ -20,6 +21,7 @@ env "local" {
 
 env "docker" {
   # Docker environment for containerized development
+  # Uses dana_dev database with extensions (created by init.sql)
   src = "file://schema.sql"
   url = "postgresql://dana_user:dana_password@postgres:5432/dana?sslmode=disable"
   dev = "postgresql://dana_user:dana_password@postgres:5432/dana_dev?sslmode=disable"
@@ -70,6 +72,7 @@ env "production" {
 
 env "existing" {
   # Use existing database with extensions already installed
+  # Uses dana_dev database with extensions (created by init.sql)
   src = "file://schema.sql"
   url = "postgresql://dana_user:dana_password@localhost:5432/dana?sslmode=disable"
   dev = "postgresql://dana_user:dana_password@localhost:5432/dana_dev?sslmode=disable"

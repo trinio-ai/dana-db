@@ -1,13 +1,17 @@
 -- PostgreSQL initialization script for DANA database
 -- This runs automatically on first database startup
 
--- Create atlas_dev database for Atlas migrations
-CREATE DATABASE atlas_dev;
+-- Install extensions in the main dana database
+-- (database is created by POSTGRES_DB env var)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
 
--- Connect to atlas_dev and install vector extension
-\c atlas_dev;
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Create dana_dev database for Atlas migrations (clean dev environment)
+CREATE DATABASE dana_dev;
 
--- Switch back to dana database for main setup
-\c dana;
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Connect to dana_dev and install required extensions
+\c dana_dev
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
