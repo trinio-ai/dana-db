@@ -3,8 +3,6 @@
 --              for each task resource (html_component, validation_schema,
 --              data_fetch_code, data_commit_code)
 
-BEGIN;
-
 -- Drop the old check constraint
 ALTER TABLE tasks DROP CONSTRAINT IF EXISTS check_storage_consistency;
 
@@ -50,5 +48,3 @@ ALTER TABLE tasks ALTER COLUMN validation_schema_s3_key DROP DEFAULT;
 
 -- Add new check constraint to ensure S3 bucket is set for all tasks
 ALTER TABLE tasks ADD CONSTRAINT check_s3_storage CHECK (s3_bucket IS NOT NULL);
-
-COMMIT;
