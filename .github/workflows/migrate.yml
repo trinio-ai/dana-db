@@ -1,0 +1,363 @@
+name: Database Migration
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'migrations/**'
+      - 'schema.sql'
+      - 'atlas.hcl'
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - 'migrations/**'
+      - 'schema.sql'
+      - 'atlas.hcl'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (plan only, no apply)'
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  FCK_NAT_INSTANCE_TAG: dana-dev-fck-nat
+  SECRET_PATH: dana/dev/database/dana
+
+jobs:
+  lint:
+    name: Lint Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Atlas
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Lint migrations
+        run: |
+          atlas migrate lint \
+            --env production \
+            --git-base origin/dev \
+            --git-dir migrations
+
+  setup-database:
+    name: Setup Database
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Get fck-nat instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ env.FCK_NAT_INSTANCE_TAG }}" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+
+          if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "Error: Could not find fck-nat instance"
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Get database credentials
+        id: get-creds
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.SECRET_PATH }}" \
+            --query 'SecretString' \
+            --output text)
+
+          echo "::add-mask::$(echo $SECRET_JSON | jq -r '.password')"
+
+          echo "host=$(echo $SECRET_JSON | jq -r '.host')" >> $GITHUB_OUTPUT
+          echo "port=$(echo $SECRET_JSON | jq -r '.port')" >> $GITHUB_OUTPUT
+          echo "dbname=$(echo $SECRET_JSON | jq -r '.dbname')" >> $GITHUB_OUTPUT
+          echo "username=$(echo $SECRET_JSON | jq -r '.username')" >> $GITHUB_OUTPUT
+          echo "password=$(echo $SECRET_JSON | jq -r '.password')" >> $GITHUB_OUTPUT
+
+      - name: Start SSM port forwarding
+        id: tunnel
+        run: |
+          aws ssm start-session \
+            --target ${{ steps.get-instance.outputs.instance_id }} \
+            --document-name AWS-StartPortForwardingSessionToRemoteHost \
+            --parameters '{"host":["${{ steps.get-creds.outputs.host }}"],"portNumber":["5432"],"localPortNumber":["15432"]}' &
+
+          TUNNEL_PID=$!
+          echo "tunnel_pid=$TUNNEL_PID" >> $GITHUB_OUTPUT
+
+          echo "Waiting for SSM tunnel to establish..."
+          for i in {1..30}; do
+            if nc -z localhost 15432 2>/dev/null; then
+              echo "SSM tunnel established successfully"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Error: SSM tunnel failed to establish"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Create database if not exists
+        env:
+          PGPASSWORD: ${{ steps.get-creds.outputs.password }}
+        run: |
+          DB_NAME="${{ steps.get-creds.outputs.dbname }}"
+
+          echo "Checking if database '$DB_NAME' exists..."
+
+          # Check if database exists by connecting to postgres database
+          DB_EXISTS=$(psql -h localhost -p 15432 -U ${{ steps.get-creds.outputs.username }} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "")
+
+          if [ "$DB_EXISTS" = "1" ]; then
+            echo "Database '$DB_NAME' already exists"
+          else
+            echo "Creating database '$DB_NAME'..."
+            psql -h localhost -p 15432 -U ${{ steps.get-creds.outputs.username }} -d postgres -c "CREATE DATABASE \"$DB_NAME\";"
+            echo "Database '$DB_NAME' created successfully"
+          fi
+
+      - name: Cleanup tunnel
+        if: always()
+        run: |
+          if [ -n "${{ steps.tunnel.outputs.tunnel_pid }}" ]; then
+            kill ${{ steps.tunnel.outputs.tunnel_pid }} 2>/dev/null || true
+          fi
+
+  plan:
+    name: Plan Migration
+    runs-on: ubuntu-latest
+    needs: [lint, setup-database]
+    if: always() && needs.lint.result == 'success' && (needs.setup-database.result == 'success' || needs.setup-database.result == 'skipped')
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install AWS Session Manager Plugin
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Get fck-nat instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ env.FCK_NAT_INSTANCE_TAG }}" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+
+          if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "Error: Could not find fck-nat instance"
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Found fck-nat instance: $INSTANCE_ID"
+
+      - name: Get database credentials
+        id: get-creds
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.SECRET_PATH }}" \
+            --query 'SecretString' \
+            --output text)
+
+          echo "::add-mask::$(echo $SECRET_JSON | jq -r '.password')"
+
+          echo "host=$(echo $SECRET_JSON | jq -r '.host')" >> $GITHUB_OUTPUT
+          echo "port=$(echo $SECRET_JSON | jq -r '.port')" >> $GITHUB_OUTPUT
+          echo "dbname=$(echo $SECRET_JSON | jq -r '.dbname')" >> $GITHUB_OUTPUT
+          echo "username=$(echo $SECRET_JSON | jq -r '.username')" >> $GITHUB_OUTPUT
+          echo "password=$(echo $SECRET_JSON | jq -r '.password')" >> $GITHUB_OUTPUT
+
+      - name: Start SSM port forwarding
+        id: tunnel
+        run: |
+          # Start SSM tunnel in background
+          aws ssm start-session \
+            --target ${{ steps.get-instance.outputs.instance_id }} \
+            --document-name AWS-StartPortForwardingSessionToRemoteHost \
+            --parameters '{"host":["${{ steps.get-creds.outputs.host }}"],"portNumber":["5432"],"localPortNumber":["15432"]}' &
+
+          TUNNEL_PID=$!
+          echo "tunnel_pid=$TUNNEL_PID" >> $GITHUB_OUTPUT
+
+          # Wait for tunnel to be ready
+          echo "Waiting for SSM tunnel to establish..."
+          for i in {1..30}; do
+            if nc -z localhost 15432 2>/dev/null; then
+              echo "SSM tunnel established successfully"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Error: SSM tunnel failed to establish"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Setup Atlas
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Plan migration
+        id: plan
+        env:
+          DATABASE_URL: "postgresql://${{ steps.get-creds.outputs.username }}:${{ steps.get-creds.outputs.password }}@localhost:15432/${{ steps.get-creds.outputs.dbname }}?sslmode=require"
+        run: |
+          echo "Checking migration status..."
+          STATUS=$(atlas migrate status --env production 2>&1) || true
+          echo "$STATUS"
+
+          if echo "$STATUS" | grep -q "No migration files"; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No pending migrations"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Pending migrations detected"
+          fi
+
+      - name: Cleanup tunnel
+        if: always()
+        run: |
+          if [ -n "${{ steps.tunnel.outputs.tunnel_pid }}" ]; then
+            kill ${{ steps.tunnel.outputs.tunnel_pid }} 2>/dev/null || true
+          fi
+
+  apply:
+    name: Apply Migration
+    runs-on: ubuntu-latest
+    needs: [setup-database, plan]
+    if: |
+      github.event_name == 'push' &&
+      needs.plan.outputs.has_changes == 'true' &&
+      (github.event.inputs.dry_run != 'true' || github.event.inputs.dry_run == '')
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install AWS Session Manager Plugin
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Get fck-nat instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ env.FCK_NAT_INSTANCE_TAG }}" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+
+          if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "Error: Could not find fck-nat instance"
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Get database credentials
+        id: get-creds
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id "${{ env.SECRET_PATH }}" \
+            --query 'SecretString' \
+            --output text)
+
+          echo "::add-mask::$(echo $SECRET_JSON | jq -r '.password')"
+
+          echo "host=$(echo $SECRET_JSON | jq -r '.host')" >> $GITHUB_OUTPUT
+          echo "port=$(echo $SECRET_JSON | jq -r '.port')" >> $GITHUB_OUTPUT
+          echo "dbname=$(echo $SECRET_JSON | jq -r '.dbname')" >> $GITHUB_OUTPUT
+          echo "username=$(echo $SECRET_JSON | jq -r '.username')" >> $GITHUB_OUTPUT
+          echo "password=$(echo $SECRET_JSON | jq -r '.password')" >> $GITHUB_OUTPUT
+
+      - name: Start SSM port forwarding
+        id: tunnel
+        run: |
+          aws ssm start-session \
+            --target ${{ steps.get-instance.outputs.instance_id }} \
+            --document-name AWS-StartPortForwardingSessionToRemoteHost \
+            --parameters '{"host":["${{ steps.get-creds.outputs.host }}"],"portNumber":["5432"],"localPortNumber":["15432"]}' &
+
+          TUNNEL_PID=$!
+          echo "tunnel_pid=$TUNNEL_PID" >> $GITHUB_OUTPUT
+
+          echo "Waiting for SSM tunnel to establish..."
+          for i in {1..30}; do
+            if nc -z localhost 15432 2>/dev/null; then
+              echo "SSM tunnel established successfully"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Error: SSM tunnel failed to establish"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Setup Atlas
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Apply migration
+        env:
+          DATABASE_URL: "postgresql://${{ steps.get-creds.outputs.username }}:${{ steps.get-creds.outputs.password }}@localhost:15432/${{ steps.get-creds.outputs.dbname }}?sslmode=require"
+        run: |
+          echo "Applying migrations..."
+          atlas migrate apply --env production
+          echo "Migrations applied successfully"
+
+      - name: Cleanup tunnel
+        if: always()
+        run: |
+          if [ -n "${{ steps.tunnel.outputs.tunnel_pid }}" ]; then
+            kill ${{ steps.tunnel.outputs.tunnel_pid }} 2>/dev/null || true
+          fi
