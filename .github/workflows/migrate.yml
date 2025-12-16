@@ -48,6 +48,9 @@ jobs:
           sudo dpkg -i session-manager-plugin.deb
           sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Get fck-nat instance ID
         id: get-instance
         run: |
@@ -127,6 +130,37 @@ jobs:
             psql -h localhost -p 15432 -U "$PG_USER" -d postgres -c "CREATE DATABASE \"$DB_NAME\";"
             echo "Database '$DB_NAME' created successfully"
           fi
+
+      - name: Sync migration state with files
+        env:
+          PGPASSWORD: ${{ steps.get-creds.outputs.password }}
+          PGCONNECT_TIMEOUT: "30"
+          PGSSLMODE: "require"
+        run: |
+          DB_NAME="${{ steps.get-creds.outputs.dbname }}"
+          PG_USER="${{ steps.get-creds.outputs.username }}"
+
+          echo "Syncing atlas_schema_revisions with current migration files..."
+
+          # Get list of migration file versions from the repo (quoted for SQL)
+          MIGRATION_VERSIONS=$(ls migrations/*.sql 2>/dev/null | sed 's|migrations/||' | sed 's|_.*||' | sort -u | sed "s/.*/'&'/" | tr '\n' ',' | sed 's/,$//')
+
+          if [ -z "$MIGRATION_VERSIONS" ]; then
+            echo "No migration files found"
+            exit 0
+          fi
+
+          echo "Migration versions in repo: $MIGRATION_VERSIONS"
+
+          # Delete any revisions that don't have corresponding migration files
+          # This handles the case where migration files were deleted
+          psql -h localhost -p 15432 -U "$PG_USER" -d "$DB_NAME" -c "
+            DELETE FROM atlas_schema_revisions
+            WHERE version NOT IN ($MIGRATION_VERSIONS)
+            AND version != '';
+          " 2>/dev/null || echo "Note: atlas_schema_revisions table may not exist yet (first run)"
+
+          echo "Migration state synced"
 
       - name: Cleanup tunnel
         if: always()
