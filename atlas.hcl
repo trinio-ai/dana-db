@@ -58,7 +58,7 @@ env "test" {
 env "production" {
   # Production environment (credentials should be provided via environment variables)
   src = "file://schema.sql"
-  url = "${DATABASE_URL}"
+  url = getenv("DATABASE_URL")
 
   migration {
     dir = "file://migrations"
@@ -67,6 +67,14 @@ env "production" {
   format {
     migrate {
       diff = "{{ sql . \"  \" }}"
+    }
+  }
+
+  # Safety: Prevent accidental destructive operations in production
+  diff {
+    skip {
+      drop_schema = true
+      drop_table  = true
     }
   }
 }
