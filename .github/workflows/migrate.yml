@@ -107,19 +107,24 @@ jobs:
       - name: Create database if not exists
         env:
           PGPASSWORD: ${{ steps.get-creds.outputs.password }}
+          PGCONNECT_TIMEOUT: "30"
+          PGSSLMODE: "require"
         run: |
           DB_NAME="${{ steps.get-creds.outputs.dbname }}"
+          PG_USER="${{ steps.get-creds.outputs.username }}"
 
           echo "Checking if database '$DB_NAME' exists..."
+          echo "Testing connection to postgres database..."
 
           # Check if database exists by connecting to postgres database
-          DB_EXISTS=$(psql -h localhost -p 15432 -U ${{ steps.get-creds.outputs.username }} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "")
+          DB_EXISTS=$(psql -h localhost -p 15432 -U "$PG_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>&1) || true
+          echo "Query result: '$DB_EXISTS'"
 
           if [ "$DB_EXISTS" = "1" ]; then
             echo "Database '$DB_NAME' already exists"
           else
             echo "Creating database '$DB_NAME'..."
-            psql -h localhost -p 15432 -U ${{ steps.get-creds.outputs.username }} -d postgres -c "CREATE DATABASE \"$DB_NAME\";"
+            psql -h localhost -p 15432 -U "$PG_USER" -d postgres -c "CREATE DATABASE \"$DB_NAME\";"
             echo "Database '$DB_NAME' created successfully"
           fi
 
