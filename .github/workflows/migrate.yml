@@ -183,13 +183,19 @@ jobs:
             --query 'SecretString' \
             --output text)
 
-          echo "::add-mask::$(echo $SECRET_JSON | jq -r '.password')"
+          PASSWORD=$(echo $SECRET_JSON | jq -r '.password')
+          echo "::add-mask::$PASSWORD"
+
+          # URL-encode the password for use in connection URLs
+          ENCODED_PASSWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PASSWORD', safe=''))")
+          echo "::add-mask::$ENCODED_PASSWORD"
 
           echo "host=$(echo $SECRET_JSON | jq -r '.host')" >> $GITHUB_OUTPUT
           echo "port=$(echo $SECRET_JSON | jq -r '.port')" >> $GITHUB_OUTPUT
           echo "dbname=$(echo $SECRET_JSON | jq -r '.dbname')" >> $GITHUB_OUTPUT
           echo "username=$(echo $SECRET_JSON | jq -r '.username')" >> $GITHUB_OUTPUT
-          echo "password=$(echo $SECRET_JSON | jq -r '.password')" >> $GITHUB_OUTPUT
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+          echo "password_encoded=$ENCODED_PASSWORD" >> $GITHUB_OUTPUT
 
       - name: Start SSM port forwarding
         id: tunnel
@@ -225,7 +231,7 @@ jobs:
       - name: Plan migration
         id: plan
         env:
-          DATABASE_URL: "postgresql://${{ steps.get-creds.outputs.username }}:${{ steps.get-creds.outputs.password }}@localhost:15432/${{ steps.get-creds.outputs.dbname }}?sslmode=require"
+          DATABASE_URL: "postgresql://${{ steps.get-creds.outputs.username }}:${{ steps.get-creds.outputs.password_encoded }}@localhost:15432/${{ steps.get-creds.outputs.dbname }}?sslmode=require"
         run: |
           echo "Checking migration status..."
           STATUS=$(atlas migrate status --env production 2>&1) || true
@@ -295,13 +301,19 @@ jobs:
             --query 'SecretString' \
             --output text)
 
-          echo "::add-mask::$(echo $SECRET_JSON | jq -r '.password')"
+          PASSWORD=$(echo $SECRET_JSON | jq -r '.password')
+          echo "::add-mask::$PASSWORD"
+
+          # URL-encode the password for use in connection URLs
+          ENCODED_PASSWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PASSWORD', safe=''))")
+          echo "::add-mask::$ENCODED_PASSWORD"
 
           echo "host=$(echo $SECRET_JSON | jq -r '.host')" >> $GITHUB_OUTPUT
           echo "port=$(echo $SECRET_JSON | jq -r '.port')" >> $GITHUB_OUTPUT
           echo "dbname=$(echo $SECRET_JSON | jq -r '.dbname')" >> $GITHUB_OUTPUT
           echo "username=$(echo $SECRET_JSON | jq -r '.username')" >> $GITHUB_OUTPUT
-          echo "password=$(echo $SECRET_JSON | jq -r '.password')" >> $GITHUB_OUTPUT
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+          echo "password_encoded=$ENCODED_PASSWORD" >> $GITHUB_OUTPUT
 
       - name: Start SSM port forwarding
         id: tunnel
@@ -334,7 +346,7 @@ jobs:
 
       - name: Apply migration
         env:
-          DATABASE_URL: "postgresql://${{ steps.get-creds.outputs.username }}:${{ steps.get-creds.outputs.password }}@localhost:15432/${{ steps.get-creds.outputs.dbname }}?sslmode=require"
+          DATABASE_URL: "postgresql://${{ steps.get-creds.outputs.username }}:${{ steps.get-creds.outputs.password_encoded }}@localhost:15432/${{ steps.get-creds.outputs.dbname }}?sslmode=require"
         run: |
           echo "Applying migrations..."
           atlas migrate apply --env production
