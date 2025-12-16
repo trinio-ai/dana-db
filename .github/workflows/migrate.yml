@@ -24,7 +24,7 @@ on:
 
 env:
   AWS_REGION: ap-northeast-2
-  FCK_NAT_INSTANCE_TAG: dana-dev-fck-nat
+  FCK_NAT_INSTANCE_TAG: dana-dev-fck-nat-1
   SECRET_PATH: dana/dev/database/dana
 
 jobs:
