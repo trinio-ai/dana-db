@@ -1,6 +1,6 @@
 # Atlas configuration for DANA database migrations
 # This file defines the database schema management configuration
-# CI/CD: Migrations are automatically applied via GitHub Actions workflow on dev branch
+# CI/CD: Database migrations are automatically applied via GitHub Actions workflow on dev branch
 
 env "local" {
   # Local development environment using local Atlas CLI
