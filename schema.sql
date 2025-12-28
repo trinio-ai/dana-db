@@ -469,6 +469,7 @@ CREATE TABLE task_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID NOT NULL REFERENCES tasks(id),
     workflow_execution_id UUID,
+    scheduled_workflow_execution_id UUID,
     user_id UUID NOT NULL REFERENCES users(id),
     task_index INTEGER DEFAULT 0,
     status VARCHAR(20) DEFAULT 'pending',
@@ -484,11 +485,18 @@ CREATE TABLE task_executions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Either workflow_execution_id or scheduled_workflow_execution_id should be set
+    CONSTRAINT chk_execution_type CHECK (
+        (workflow_execution_id IS NOT NULL AND scheduled_workflow_execution_id IS NULL) OR
+        (workflow_execution_id IS NULL AND scheduled_workflow_execution_id IS NOT NULL) OR
+        (workflow_execution_id IS NULL AND scheduled_workflow_execution_id IS NULL)
+    )
 );
 
 CREATE INDEX idx_task_executions_task ON task_executions(task_id, created_at DESC);
 CREATE INDEX idx_task_executions_workflow ON task_executions(workflow_execution_id);
+CREATE INDEX idx_task_executions_scheduled_workflow ON task_executions(scheduled_workflow_execution_id);
 CREATE INDEX idx_task_executions_user ON task_executions(user_id);
 CREATE INDEX idx_task_executions_status ON task_executions(status);
 
@@ -564,7 +572,7 @@ CREATE TABLE agent_activities (
 CREATE INDEX idx_activities_agent ON agent_activities(agent_id, created_at DESC);
 CREATE INDEX idx_activities_status ON agent_activities(status);
 
-CREATE TABLE scheduled_tasks (
+CREATE TABLE scheduled_workflows (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
     agent_id UUID REFERENCES ai_agents(id),
@@ -583,9 +591,41 @@ CREATE TABLE scheduled_tasks (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_scheduled_tasks_org ON scheduled_tasks(organization_id);
-CREATE INDEX idx_scheduled_tasks_status ON scheduled_tasks(status);
-CREATE INDEX idx_scheduled_tasks_next_run ON scheduled_tasks(next_run);
+CREATE INDEX idx_scheduled_workflows_org ON scheduled_workflows(organization_id);
+CREATE INDEX idx_scheduled_workflows_status ON scheduled_workflows(status);
+CREATE INDEX idx_scheduled_workflows_next_run ON scheduled_workflows(next_run);
+
+-- Scheduled workflow executions (separate from manual workflow executions)
+CREATE TABLE scheduled_workflow_executions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheduled_workflow_id UUID NOT NULL REFERENCES scheduled_workflows(id) ON DELETE CASCADE,
+    workflow_id UUID NOT NULL REFERENCES workflows(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    org_id UUID NOT NULL REFERENCES organizations(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    input_parameters JSONB,
+    result_data JSONB,
+    execution_graph JSONB,
+    current_tasks JSONB DEFAULT '[]',
+    error_message TEXT,
+    error_details JSONB,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    execution_time_ms INTEGER,
+    queue_time_ms INTEGER,
+    total_tasks INTEGER DEFAULT 0,
+    completed_tasks INTEGER DEFAULT 0,
+    worker_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_scheduled_workflow_executions_scheduled ON scheduled_workflow_executions(scheduled_workflow_id, created_at DESC);
+CREATE INDEX idx_scheduled_workflow_executions_workflow ON scheduled_workflow_executions(workflow_id);
+CREATE INDEX idx_scheduled_workflow_executions_org ON scheduled_workflow_executions(org_id);
+CREATE INDEX idx_scheduled_workflow_executions_status ON scheduled_workflow_executions(status);
 
 -- ============================================================================
 -- SECURITY & AUDIT
@@ -795,7 +835,8 @@ CREATE TRIGGER update_task_permissions_updated_at BEFORE UPDATE ON task_permissi
 CREATE TRIGGER update_task_executions_updated_at BEFORE UPDATE ON task_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_workflow_executions_updated_at BEFORE UPDATE ON workflow_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_ai_agents_updated_at BEFORE UPDATE ON ai_agents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_scheduled_tasks_updated_at BEFORE UPDATE ON scheduled_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_scheduled_workflows_updated_at BEFORE UPDATE ON scheduled_workflows FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_scheduled_workflow_executions_updated_at BEFORE UPDATE ON scheduled_workflow_executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_chat_document_embeddings_updated_at BEFORE UPDATE ON chat_document_embeddings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_library_registry_updated_at BEFORE UPDATE ON library_registry FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_environment_profiles_updated_at BEFORE UPDATE ON environment_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
