@@ -291,6 +291,7 @@ CREATE TABLE workflows (
     parent_workflow_id UUID REFERENCES workflows(id),
     is_latest_version BOOLEAN DEFAULT true,
     is_sandbox BOOLEAN NOT NULL DEFAULT false,
+    is_scheduled BOOLEAN NOT NULL DEFAULT false,
     source_workflow_id UUID,
     avg_execution_time_ms INTEGER DEFAULT 0,
     total_executions INTEGER DEFAULT 0,
@@ -304,6 +305,7 @@ CREATE INDEX idx_workflows_user ON workflows(created_by, status);
 CREATE INDEX idx_workflows_org ON workflows(organization_id);
 CREATE INDEX idx_workflows_module ON workflows(module_id);
 CREATE INDEX idx_workflows_is_sandbox ON workflows(is_sandbox);
+CREATE INDEX idx_workflows_is_scheduled ON workflows(is_scheduled);
 CREATE INDEX idx_workflows_source_workflow_id ON workflows(source_workflow_id);
 
 -- Workflow permissions (user-scoped with explicit sharing)
@@ -576,7 +578,7 @@ CREATE TABLE scheduled_workflows (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
     agent_id UUID REFERENCES ai_agents(id),
-    workflow_id UUID REFERENCES workflows(id),
+    workflow_id UUID NOT NULL REFERENCES workflows(id),
     name VARCHAR(255) NOT NULL,
     schedule_expression VARCHAR(100) NOT NULL,
     timezone VARCHAR(50) DEFAULT 'UTC',

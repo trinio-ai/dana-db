@@ -1,4 +1,4 @@
-h1:5SqFuWH/1/UYinQwZrjBqOQ0l2dSivmw06XTgYdP/iU=
+h1:/n6E9sXYSmsTZo1ggXjeJkbGxCBWKjnScK1lTQMOd1k=
 20251023000000_initial_extensions.sql h1:9WL6yJi7PwR+4PRjngPuJq/E8Bg39/SCVdSt6d+yJTc=
 20251023133153_migration_20251023_223152.sql h1:TiqGUNpW5qVK+TkKXYNT2pKnGH3wVKq0dAyhOapHC9E=
 20251024000000_update_tasks_s3_fields.sql h1:2T7WkWZ5NzfO92aYFn+eyEe+Vj/ihy1eT/N7M2LLyHY=
@@ -32,3 +32,4 @@ h1:5SqFuWH/1/UYinQwZrjBqOQ0l2dSivmw06XTgYdP/iU=
 20251201110000_add_task_modules_table.sql h1:dCODUCme8yV8rA7PWQWOv75lrEPLGv0b8NkE7wR2PHU=
 20251228205827_rename_scheduled_tasks_to_scheduled_workflows.sql h1:ac9spGfFnkk/BBO4W7+uCKrnveKi+6ThIspl42+o/DM=
 20251228215710_add_scheduled_workflow_executions_table.sql h1:jj8kBgGuYLSWJPY7w8HQkM9FC0OeO0IfEuqso3mtWUc=
+20251229100453_add_is_scheduled_to_workflows.sql h1:ymFhtD9+0uohinIk6Oaj8bYeWoyzt3D0UuvP8e/J3wA=
