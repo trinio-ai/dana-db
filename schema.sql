@@ -653,20 +653,29 @@ CREATE INDEX idx_apikeys_hash ON api_keys(key_hash);
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    user_id UUID REFERENCES users(id),
-    event_type VARCHAR(50) NOT NULL,
-    resource_type VARCHAR(50),
-    resource_id UUID,
-    event_data JSONB DEFAULT '{}',
-    ip_address INET,
-    user_agent TEXT,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    user_email VARCHAR(255),
+    action_type VARCHAR(50) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id VARCHAR(255),
+    resource_name VARCHAR(255),
+    ip_address VARCHAR(45),
+    user_agent VARCHAR(500),
+    before_value JSONB,
+    after_value JSONB,
+    extra_data JSONB DEFAULT '{}',
+    description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'success',
+    error_message TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX idx_audit_logs_org_date ON audit_logs(organization_id, created_at DESC);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_event_type ON audit_logs(event_type);
+CREATE INDEX idx_audit_logs_action_type ON audit_logs(action_type);
+CREATE INDEX idx_audit_logs_resource_type ON audit_logs(resource_type);
+CREATE INDEX idx_audit_logs_resource_id ON audit_logs(resource_id);
 
 CREATE TABLE data_access_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
