@@ -1,4 +1,4 @@
-h1:ZjSg+gHPvu+DiK5LKR8m+Y/6HSeQ2A98+dDkqMw1GEg=
+h1:ERCHXD0VUED1AmwhNfQ2pI6l4cYL1EZhvvssujoIs78=
 20251023000000_initial_extensions.sql h1:9WL6yJi7PwR+4PRjngPuJq/E8Bg39/SCVdSt6d+yJTc=
 20251023133153_migration_20251023_223152.sql h1:TiqGUNpW5qVK+TkKXYNT2pKnGH3wVKq0dAyhOapHC9E=
 20251024000000_update_tasks_s3_fields.sql h1:2T7WkWZ5NzfO92aYFn+eyEe+Vj/ihy1eT/N7M2LLyHY=
@@ -34,3 +34,4 @@ h1:ZjSg+gHPvu+DiK5LKR8m+Y/6HSeQ2A98+dDkqMw1GEg=
 20251228215710_add_scheduled_workflow_executions_table.sql h1:jj8kBgGuYLSWJPY7w8HQkM9FC0OeO0IfEuqso3mtWUc=
 20251229100453_add_is_scheduled_to_workflows.sql h1:ymFhtD9+0uohinIk6Oaj8bYeWoyzt3D0UuvP8e/J3wA=
 20260105040841_enhance_audit_logs.sql h1:bj3IebeQnLmaOslvcp/V+UKHo/08zjRd590zg5zuWQo=
+20260107020037_add_organization_data_rules.sql h1:MAG7R6poeANXGdhWB2sXKJBN+dVt1/hpoZchdtish+s=

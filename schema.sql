@@ -823,6 +823,93 @@ CREATE TABLE performance_baselines (
 CREATE INDEX idx_baselines_org ON performance_baselines(organization_id);
 
 -- ============================================================================
+-- ORGANIZATION DATA RULES (AI Data Manipulation Rules)
+-- ============================================================================
+
+-- Organization-level data rules for AI data manipulation
+-- Stores system instructions, global settings, and metadata for each organization
+CREATE TABLE organization_data_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+    -- AI Instructions: General directives for AI when manipulating data
+    system_instructions TEXT,
+
+    -- Global Settings: Organization-wide defaults (currency, decimal places, etc.)
+    global_settings JSONB DEFAULT '{
+        "currency": "KRW",
+        "decimal_places": 2,
+        "date_format": "YYYY-MM-DD",
+        "default_territory": null,
+        "default_warehouse": null
+    }'::jsonb,
+
+    -- Active status
+    is_active BOOLEAN DEFAULT true,
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES users(id),
+    updated_by UUID REFERENCES users(id),
+
+    UNIQUE(organization_id)
+);
+
+CREATE INDEX idx_org_data_rules_org_id ON organization_data_rules(organization_id);
+CREATE INDEX idx_org_data_rules_active ON organization_data_rules(is_active);
+
+-- DocType-specific validation rules
+-- Each row defines create/update/delete rules for a specific ERPNext DocType
+CREATE TABLE organization_doctype_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_data_rules_id UUID NOT NULL REFERENCES organization_data_rules(id) ON DELETE CASCADE,
+
+    -- DocType identifier (e.g., "Item", "Customer", "Sales Order")
+    doctype VARCHAR(140) NOT NULL,
+
+    -- CREATE operation rules
+    -- Structure: { enabled, required_fields[], forbidden_fields[], auto_set_fields{}, validations[] }
+    create_rules JSONB DEFAULT '{
+        "enabled": true,
+        "required_fields": [],
+        "forbidden_fields": [],
+        "auto_set_fields": {},
+        "validations": []
+    }'::jsonb,
+
+    -- UPDATE operation rules
+    -- Structure: { enabled, protected_fields[], validations[] }
+    update_rules JSONB DEFAULT '{
+        "enabled": true,
+        "protected_fields": [],
+        "validations": []
+    }'::jsonb,
+
+    -- DELETE operation rules
+    -- Structure: { enabled, forbidden, forbidden_message, require_confirmation, conditions[] }
+    delete_rules JSONB DEFAULT '{
+        "enabled": true,
+        "forbidden": false,
+        "forbidden_message": null,
+        "require_confirmation": false,
+        "conditions": []
+    }'::jsonb,
+
+    -- DocType-specific AI instructions
+    doctype_instructions TEXT,
+
+    -- Audit fields
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    UNIQUE(organization_data_rules_id, doctype)
+);
+
+CREATE INDEX idx_doctype_rules_parent ON organization_doctype_rules(organization_data_rules_id);
+CREATE INDEX idx_doctype_rules_doctype ON organization_doctype_rules(doctype);
+
+-- ============================================================================
 -- TRIGGERS FOR UPDATED_AT
 -- ============================================================================
 
@@ -851,6 +938,8 @@ CREATE TRIGGER update_scheduled_workflow_executions_updated_at BEFORE UPDATE ON 
 CREATE TRIGGER update_chat_document_embeddings_updated_at BEFORE UPDATE ON chat_document_embeddings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_library_registry_updated_at BEFORE UPDATE ON library_registry FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_environment_profiles_updated_at BEFORE UPDATE ON environment_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_organization_data_rules_updated_at BEFORE UPDATE ON organization_data_rules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_organization_doctype_rules_updated_at BEFORE UPDATE ON organization_doctype_rules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Add forward-referenced foreign key constraints
 ALTER TABLE task_executions
