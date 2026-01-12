@@ -1,5 +1,3 @@
--- Modify "organizations" table
-ALTER TABLE "public"."organizations" DROP COLUMN "is_sandbox", DROP COLUMN "source_organization_id";
 -- Create "workflow_tasks" table
 CREATE TABLE "public"."workflow_tasks" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
