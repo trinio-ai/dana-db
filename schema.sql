@@ -827,22 +827,13 @@ CREATE INDEX idx_baselines_org ON performance_baselines(organization_id);
 -- ============================================================================
 
 -- Organization-level data rules for AI data manipulation
--- Stores system instructions, global settings, and metadata for each organization
+-- Stores system instructions and metadata for each organization
 CREATE TABLE organization_data_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
     -- AI Instructions: General directives for AI when manipulating data
     system_instructions TEXT,
-
-    -- Global Settings: Organization-wide defaults (currency, decimal places, etc.)
-    global_settings JSONB DEFAULT '{
-        "currency": "KRW",
-        "decimal_places": 2,
-        "date_format": "YYYY-MM-DD",
-        "default_territory": null,
-        "default_warehouse": null
-    }'::jsonb,
 
     -- Active status
     is_active BOOLEAN DEFAULT true,
